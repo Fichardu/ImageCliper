@@ -1,0 +1,4 @@
+ImageCliper
+===========
+
+ImageCliper for Android
