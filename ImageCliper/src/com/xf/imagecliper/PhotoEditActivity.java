@@ -67,7 +67,7 @@ public class PhotoEditActivity extends Activity implements OnClickListener {
 
 		mClipWidth = getWindowManager().getDefaultDisplay().getWidth();
 		mClipHeight = (int) (mClipWidth / RATIO);
-		// 选择区域的边框，大小根据mClipWidth设置
+		
 		View squareView = findViewById(R.id.photo_edit_square);
 		squareView.setLayoutParams(new LinearLayout.LayoutParams(mClipWidth,
 				mClipHeight));
@@ -83,10 +83,7 @@ public class PhotoEditActivity extends Activity implements OnClickListener {
 		super.onDestroy();
 	}
 
-	/**
-	 * 加载图片
-	 * 
-	 */
+	
 	private class LoadBitmapAsyncTask extends AsyncTask<String, Void, Bitmap> {
 
 		private ImageView cmImageView;
@@ -104,7 +101,7 @@ public class PhotoEditActivity extends Activity implements OnClickListener {
 		@Override
 		protected void onPreExecute() {
 			cmProgressDialog = new ProgressDialog(PhotoEditActivity.this);
-			cmProgressDialog.setMessage("正在加载");
+			cmProgressDialog.setMessage("Loading");
 			cmProgressDialog.show();
 		}
 
@@ -136,27 +133,27 @@ public class PhotoEditActivity extends Activity implements OnClickListener {
 
 			int bmpWidth = bitmap.getWidth();
 			int bmpHeight = bitmap.getHeight();
-			// 读图片的拍摄角度
+			
 			int picRotateDegree = readPicDegree(filePath);
 			Matrix matrix = new Matrix();
 			matrix.reset();
-			// 图片旋转啦
+			
 			if (picRotateDegree == 90) {
 				matrix.postRotate(90);
-				// 交换长宽
+				
 				int temp = bmpWidth;
 				bmpWidth = bmpHeight;
 				bmpHeight = temp;
 			}
 
-			// 以短边长算缩放
+			
 			float scale = cmSideHeightLimit / bmpHeight;
 			if (bmpWidth < bmpHeight) {
 				scale = cmSideWidthLimit / bmpWidth;
 			}
 			matrix.postScale(scale, scale);
 
-			// 创建缩放后的图像
+			
 			Bitmap processedBitmap = null;
 			try {
 				processedBitmap = Bitmap.createBitmap(bitmap, 0, 0,
@@ -187,12 +184,7 @@ public class PhotoEditActivity extends Activity implements OnClickListener {
 			cmProgressDialog.dismiss();
 		}
 
-		/**
-		 * 从图片exif信息中读取拍摄旋转度数
-		 * 
-		 * @param filePath
-		 * @return
-		 */
+		
 		private int readPicDegree(String filePath) {
 			int degree = 0;
 			try {
