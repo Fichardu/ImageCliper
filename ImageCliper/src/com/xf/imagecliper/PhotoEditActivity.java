@@ -67,11 +67,10 @@ public class PhotoEditActivity extends Activity implements OnClickListener {
 
 		mClipWidth = getWindowManager().getDefaultDisplay().getWidth();
 		mClipHeight = (int) (mClipWidth / RATIO);
-		
+
 		View squareView = findViewById(R.id.photo_edit_square);
 		squareView.setLayoutParams(new LinearLayout.LayoutParams(mClipWidth,
 				mClipHeight));
-
 	}
 
 	@Override
@@ -81,212 +80,6 @@ public class PhotoEditActivity extends Activity implements OnClickListener {
 			mBitmap = null;
 		}
 		super.onDestroy();
-	}
-
-	
-	private class LoadBitmapAsyncTask extends AsyncTask<String, Void, Bitmap> {
-
-		private ImageView cmImageView;
-		private float cmSideWidthLimit;
-		private float cmSideHeightLimit;
-		private ProgressDialog cmProgressDialog = null;
-
-		public LoadBitmapAsyncTask(ImageView imageView, int viewWidth,
-				int viewHeight) {
-			cmImageView = imageView;
-			cmSideWidthLimit = viewWidth;
-			cmSideHeightLimit = viewHeight;
-		}
-
-		@Override
-		protected void onPreExecute() {
-			cmProgressDialog = new ProgressDialog(PhotoEditActivity.this);
-			cmProgressDialog.setMessage("Loading");
-			cmProgressDialog.show();
-		}
-
-		@Override
-		protected Bitmap doInBackground(String... params) {
-
-			String filePath = params[0];
-
-			Options opt = new Options();
-			opt.inJustDecodeBounds = true;
-			BitmapFactory.decodeFile(filePath, opt);
-
-			Bitmap bitmap = null;
-			if (opt.outWidth > 480 || opt.outHeight > 800) {
-				int sampleSizeW = opt.outWidth / 480;
-				int sampleSizeH = opt.outHeight / 800;
-				int sample = sampleSizeW < sampleSizeH ? sampleSizeW
-						: sampleSizeH;
-
-				bitmap = decodeBitmap(filePath, sample);
-
-			} else {
-				bitmap = decodeBitmap(filePath, 1);
-			}
-
-			if (bitmap == null) {
-				return null;
-			}
-
-			int bmpWidth = bitmap.getWidth();
-			int bmpHeight = bitmap.getHeight();
-			
-			int picRotateDegree = readPicDegree(filePath);
-			Matrix matrix = new Matrix();
-			matrix.reset();
-			
-			if (picRotateDegree == 90) {
-				matrix.postRotate(90);
-				
-				int temp = bmpWidth;
-				bmpWidth = bmpHeight;
-				bmpHeight = temp;
-			}
-
-			
-			float scale = cmSideHeightLimit / bmpHeight;
-			if (bmpWidth < bmpHeight) {
-				scale = cmSideWidthLimit / bmpWidth;
-			}
-			matrix.postScale(scale, scale);
-
-			
-			Bitmap processedBitmap = null;
-			try {
-				processedBitmap = Bitmap.createBitmap(bitmap, 0, 0,
-						bitmap.getWidth(), bitmap.getHeight(), matrix, true);
-				if (processedBitmap != bitmap) {
-					bitmap.recycle();
-					bitmap = null;
-				}
-			} catch (OutOfMemoryError e) {
-
-			}
-			return processedBitmap;
-		}
-
-		@Override
-		protected void onPostExecute(Bitmap result) {
-			mBitmap = result;
-			mBitmapWidth = result.getWidth();
-			mBitmapHeight = result.getHeight();
-			cmImageView.setImageBitmap(result);
-			View squareView = findViewById(R.id.photo_edit_square);
-			mTopOffset = squareView.getTop();
-			if (mBitmapWidth >= mBitmapHeight) {
-				Matrix matrix = cmImageView.getImageMatrix();
-				matrix.postTranslate(0, mTopOffset);
-				cmImageView.setImageMatrix(matrix);
-			}
-			cmProgressDialog.dismiss();
-		}
-
-		
-		private int readPicDegree(String filePath) {
-			int degree = 0;
-			try {
-				ExifInterface exifInterface = new ExifInterface(filePath);
-				int orientation = exifInterface.getAttributeInt(
-						ExifInterface.TAG_ORIENTATION,
-						ExifInterface.ORIENTATION_NORMAL);
-				switch (orientation) {
-				case ExifInterface.ORIENTATION_ROTATE_90:
-					degree = 90;
-					break;
-				case ExifInterface.ORIENTATION_ROTATE_180:
-					degree = 180;
-					break;
-				case ExifInterface.ORIENTATION_ROTATE_270:
-					degree = 270;
-					break;
-				}
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-			return degree;
-		}
-
-		private Bitmap decodeBitmap(String filePath, int sampleSize) {
-			if (sampleSize < 1) {
-				sampleSize = 1;
-			}
-			Bitmap bitmap = null;
-
-			while (bitmap == null) {
-				try {
-					Options opts = new Options();
-					opts.inSampleSize = sampleSize;
-					bitmap = BitmapFactory.decodeFile(filePath, opts);
-				} catch (OutOfMemoryError oom) {
-					++sampleSize;
-				} catch (Exception e) {
-					break;
-				}
-			}
-
-			return bitmap;
-		}
-
-	}
-
-	private class SaveBitmapAsyncTask extends AsyncTask<Void, Void, Void> {
-
-		private ProgressDialog cmProgressDialog = null;
-
-		@Override
-		protected void onPreExecute() {
-			cmProgressDialog = new ProgressDialog(PhotoEditActivity.this);
-			cmProgressDialog.setMessage("Saving...");
-			cmProgressDialog.show();
-		}
-
-		@Override
-		protected Void doInBackground(Void... params) {
-			Matrix matrix = mImageView.getImageMatrix();
-			float[] values = new float[9];
-			matrix.getValues(values);
-			float scaleX = values[0];
-			float transX = values[2];
-			float scaleY = values[4];
-			float transY = values[5];
-
-			int x = (int) ((mLeftOffset - transX) / scaleX);
-			int y = (int) ((mTopOffset - transY) / scaleY);
-			int width = (int) (mClipWidth / scaleX);
-			int height = (int) (mClipHeight / scaleY);
-			if (x + width > mBitmapWidth) {
-				width = mBitmapWidth - x;
-			}
-			Bitmap cropBitmap = Bitmap.createBitmap(mBitmap, x, y, width,
-					height);
-			Bitmap scaleBitmap = Bitmap.createScaledBitmap(cropBitmap,
-					mScaleImageWidth, mScaleImageHeight, true);
-			try {
-				File outFile = new File(getCameraFilePath(),
-						System.currentTimeMillis() + ".jpg");
-				outFile.createNewFile();
-				FileOutputStream outStream = new FileOutputStream(outFile);
-				scaleBitmap.compress(CompressFormat.JPEG, 100, outStream);
-				outStream.close();
-			} catch (IOException e) {
-			}
-			cropBitmap.recycle();
-			scaleBitmap.recycle();
-			cropBitmap = null;
-			scaleBitmap = null;
-			return null;
-		}
-
-		@Override
-		protected void onPostExecute(Void result) {
-			cmProgressDialog.dismiss();
-			PhotoEditActivity.this.setResult(RESULT_OK);
-			PhotoEditActivity.this.finish();
-		}
-
 	}
 
 	private class ImageTouchListener implements OnTouchListener {
@@ -528,7 +321,7 @@ public class PhotoEditActivity extends Activity implements OnClickListener {
 					}
 					cursor.close();
 				}
-				new LoadBitmapAsyncTask(mImageView, mClipWidth, mClipHeight)
+				new LoadBitmapAsyncTask(mClipWidth, mClipHeight)
 						.execute(mPhotoPath);
 			}
 		}
@@ -541,6 +334,189 @@ public class PhotoEditActivity extends Activity implements OnClickListener {
 			filePath.mkdir();
 		}
 		return filePath.getAbsolutePath();
+	}
+	
+	private class LoadBitmapAsyncTask extends AsyncTask<String, Void, Bitmap> {
+		private ProgressDialog cmProgressDialog = null;
+		private float cmSideWidthLimit;
+		private float cmSideHeightLimit;
+
+		public LoadBitmapAsyncTask(int viewWidth, int viewHeight) {
+			cmSideWidthLimit = viewWidth;
+			cmSideHeightLimit = viewHeight;
+		}
+
+		@Override
+		protected void onPreExecute() {
+			cmProgressDialog = new ProgressDialog(PhotoEditActivity.this);
+			cmProgressDialog.setMessage("Loading");
+			cmProgressDialog.show();
+		}
+
+		@Override
+		protected Bitmap doInBackground(String... params) {
+			String filePath = params[0];
+			Options opt = new Options();
+			opt.inJustDecodeBounds = true;
+			BitmapFactory.decodeFile(filePath, opt);
+
+			int sampleFctor = 1;
+			if (opt.outWidth > 480 || opt.outHeight > 800) {
+				int sampleW = opt.outWidth / 480;
+				int sampleH = opt.outHeight / 800;
+				sampleFctor = sampleW < sampleH ? sampleW : sampleH;
+			}
+			Bitmap bitmap = decodeBitmap(filePath, sampleFctor);
+			if (bitmap == null) {
+				return null;
+			}
+
+			int bmpWidth = bitmap.getWidth();
+			int bmpHeight = bitmap.getHeight();
+			int rotateDegree = readPicDegree(filePath);
+			Matrix matrix = new Matrix();
+			if (rotateDegree == 90) {
+				matrix.postRotate(90);
+				bmpWidth = bitmap.getHeight();
+				bmpHeight = bitmap.getWidth();
+			}
+			float scale = 1.0f;
+			if (bmpWidth < bmpHeight) {
+				scale = cmSideWidthLimit / bmpWidth;
+			} else {
+				scale = cmSideHeightLimit / bmpHeight;
+			}
+			matrix.postScale(scale, scale);
+
+			Bitmap processedBitmap = null;
+			try {
+				processedBitmap = Bitmap.createBitmap(bitmap, 0, 0,
+						bitmap.getWidth(), bitmap.getHeight(), matrix, true);
+				if (processedBitmap != bitmap) {
+					bitmap.recycle();
+					bitmap = null;
+				}
+			} catch (OutOfMemoryError e) {
+
+			}
+			return processedBitmap;
+		}
+
+		@Override
+		protected void onPostExecute(Bitmap result) {
+			mBitmap = result;
+			mBitmapWidth = result.getWidth();
+			mBitmapHeight = result.getHeight();
+			mImageView.setImageBitmap(result);
+			View squareView = findViewById(R.id.photo_edit_square);
+			mTopOffset = squareView.getTop();
+			if (mBitmapWidth >= mBitmapHeight) {
+				Matrix matrix = mImageView.getImageMatrix();
+				matrix.postTranslate(0, mTopOffset);
+				mImageView.setImageMatrix(matrix);
+			}
+			cmProgressDialog.dismiss();
+		}
+
+		private int readPicDegree(String filePath) {
+			int degree = 0;
+			try {
+				ExifInterface exifInterface = new ExifInterface(filePath);
+				int orientation = exifInterface.getAttributeInt(
+						ExifInterface.TAG_ORIENTATION,
+						ExifInterface.ORIENTATION_NORMAL);
+				switch (orientation) {
+				case ExifInterface.ORIENTATION_ROTATE_90:
+					degree = 90;
+					break;
+				case ExifInterface.ORIENTATION_ROTATE_180:
+					degree = 180;
+					break;
+				case ExifInterface.ORIENTATION_ROTATE_270:
+					degree = 270;
+					break;
+				}
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+			return degree;
+		}
+
+		private Bitmap decodeBitmap(String filePath, int sampleSize) {
+			if (sampleSize < 1) {
+				sampleSize = 1;
+			}
+			Bitmap bitmap = null;
+			while (bitmap == null) {
+				try {
+					Options opts = new Options();
+					opts.inSampleSize = sampleSize;
+					bitmap = BitmapFactory.decodeFile(filePath, opts);
+				} catch (OutOfMemoryError oom) {
+					++sampleSize;
+				} catch (Exception e) {
+					break;
+				}
+			}
+			return bitmap;
+		}
+	}
+
+	private class SaveBitmapAsyncTask extends AsyncTask<Void, Void, Void> {
+
+		private ProgressDialog cmProgressDialog = null;
+
+		@Override
+		protected void onPreExecute() {
+			cmProgressDialog = new ProgressDialog(PhotoEditActivity.this);
+			cmProgressDialog.setMessage("Saving...");
+			cmProgressDialog.show();
+		}
+
+		@Override
+		protected Void doInBackground(Void... params) {
+			Matrix matrix = mImageView.getImageMatrix();
+			float[] values = new float[9];
+			matrix.getValues(values);
+			float scaleX = values[0];
+			float transX = values[2];
+			float scaleY = values[4];
+			float transY = values[5];
+
+			int x = (int) ((mLeftOffset - transX) / scaleX);
+			int y = (int) ((mTopOffset - transY) / scaleY);
+			int width = (int) (mClipWidth / scaleX);
+			int height = (int) (mClipHeight / scaleY);
+			if (x + width > mBitmapWidth) {
+				width = mBitmapWidth - x;
+			}
+			Bitmap cropBitmap = Bitmap.createBitmap(mBitmap, x, y, width,
+					height);
+			Bitmap scaleBitmap = Bitmap.createScaledBitmap(cropBitmap,
+					mScaleImageWidth, mScaleImageHeight, true);
+			try {
+				File outFile = new File(getCameraFilePath(),
+						System.currentTimeMillis() + ".jpg");
+				outFile.createNewFile();
+				FileOutputStream outStream = new FileOutputStream(outFile);
+				scaleBitmap.compress(CompressFormat.JPEG, 100, outStream);
+				outStream.close();
+			} catch (IOException e) {
+			}
+			cropBitmap.recycle();
+			scaleBitmap.recycle();
+			cropBitmap = null;
+			scaleBitmap = null;
+			return null;
+		}
+
+		@Override
+		protected void onPostExecute(Void result) {
+			cmProgressDialog.dismiss();
+			PhotoEditActivity.this.setResult(RESULT_OK);
+			PhotoEditActivity.this.finish();
+		}
+
 	}
 
 }
