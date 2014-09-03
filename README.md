@@ -3,7 +3,7 @@ ImageCliper
 
 A simple demo of image clipping for Android. Support drag and zoom gesture.
 
-![](https://github.com/Fichardu/ImageCliper/blob/master/art/screen_shot.png)
+<img src="https://github.com/Fichardu/ImageCliper/blob/master/art/screen_shot.png" width="360">
 
 Tips
 =====
